@@ -6,8 +6,7 @@ namespace ECDH25519.Implementation
 {
     public sealed class PublicKey
     {
-        public byte[] KeyValue { get; set; }
-        
+        public byte[] KeyValue { get; set; }        
         internal Guid Uid { get; }
                 
         
@@ -17,7 +16,7 @@ namespace ECDH25519.Implementation
         /// <param name="secretKey">My Private Key</param>
         internal PublicKey(SecretKey secretKey)
         {
-            KeyValue = AlgorithmService.GetPublicKey(privateKey: secretKey.KeyValue);            
+            KeyValue = AlgorithmService.GetPublicKey(secretKey: secretKey.KeyValue);            
             Uid = Guid.NewGuid();
         }
         

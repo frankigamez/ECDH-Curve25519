@@ -3,13 +3,27 @@ using System.Runtime.CompilerServices;
 
 namespace ECDH25519.Algorithm.Core.Operations
 {
-	public static class MontgomeryOperations
+	internal static class MontgomeryOperations
 	{
-		public static void ScalarMultiply(byte[] q, int qoffset, byte[] n, int noffset, byte[] p, int poffset)
+		public static byte[] ScalarMultiply(byte[] n, byte[] p, int qSize)
 		{
-			var p0 = FieldElementOperations.FromBytes(p, poffset);
-			var q0 = Calculate(n, noffset, ref p0);
-			FieldElementOperations.ToBytes(q, qoffset, ref q0);
+			var q = new byte[qSize];
+			var qSegment = new ArraySegment<byte>(q);
+			var nSegment = new ArraySegment<byte>(n);
+			var pSegment = new ArraySegment<byte>(p);
+			
+			var p0 = FieldElementOperations.FromBytes(pSegment.Array, pSegment.Offset);
+			var q0 = Calculate(nSegment.Array, nSegment.Offset, ref p0);
+			FieldElementOperations.ToBytes(qSegment.Array, qSegment.Offset, ref q0);
+			
+			return q;
+		}
+		
+		public static void Clamp(byte[] s, int offset)
+		{
+			s[offset + 0] &= 248;
+			s[offset + 31] &= 127;
+			s[offset + 31] |= 64;
 		}
 
 		private static FieldElement Calculate(byte[] n, int noffset, ref FieldElement p)
@@ -26,7 +40,7 @@ namespace ECDH25519.Algorithm.Core.Operations
 
 			for (i = 0; i < 32; ++i)
 				e[i] = n[noffset + i];
-		    ScalarOperations.Clamp(e, 0);
+		    Clamp(e, 0);
 			x1 = p;
 			x2 = FieldElementOperations.Set1();
 			z2 = FieldElementOperations.Set0();
