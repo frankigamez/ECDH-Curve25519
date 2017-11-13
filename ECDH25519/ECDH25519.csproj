@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="ECDHCurve25519.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Implementation\SigningKey.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Properties\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Remove="Properties\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Properties\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Algorithm\Internal\Sha512Internal.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Algorithm\Internal\Poly1305Donna.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Algorithm\Internal\Array8.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Algorithm\Internal\Ed25519Ref10\sign.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Algorithm\Internal\Ed25519Ref10\open.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Algorithm\Internal\Ed25519Ref10\keypair.cs" />
+  </ItemGroup>
+</Project>
