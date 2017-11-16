@@ -21,8 +21,7 @@ namespace ECDH25519.Tests
             var aliceShared = alicePrivate.GetSharedSecretKey(peerPublicKey: bobPublic);
             var bobShared = bobPrivate.GetSharedSecretKey(peerPublicKey: alicePublic);
 
-            Assert.AreEqual(aliceShared.ToString(), bobShared.ToString());
-            TestHelpers.AssertEqualBytes(aliceShared.KeyValue, bobShared.KeyValue);
+            Assert.IsTrue(aliceShared.KeyValue.SequenceEqual(bobShared.KeyValue));
         }
 
         [TestMethod]
@@ -39,8 +38,7 @@ namespace ECDH25519.Tests
             var aliceShared = alicePrivate.GetSharedSecretKey(peerPublicKey: bobPublic);
             var bobShared = bobPrivate.GetSharedSecretKey(peerPublicKey: alicePublic);
 
-            Assert.AreNotEqual(aliceShared.ToString(), bobShared.ToString());
-            TestHelpers.AssertNotEqualBytes(aliceShared.KeyValue, bobShared.KeyValue);
+            Assert.IsFalse(aliceShared.KeyValue.SequenceEqual(bobShared.KeyValue));            
         }
 
         [TestMethod]

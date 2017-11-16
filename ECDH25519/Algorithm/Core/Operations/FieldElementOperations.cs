@@ -2,11 +2,8 @@
 {
 	internal static class FieldElementOperations
 	{
-		public static FieldElement Set0() => new FieldElement();
-
-		
-		public static FieldElement Set1() => new FieldElement {X0 = 1};
-
+		internal static FieldElement Set0() => new FieldElement();	
+		internal static FieldElement Set1() => new FieldElement {X0 = 1};
 		
 		/// <summary>
 		/// h = f + g
@@ -34,18 +31,45 @@
 			X8 = f.X8 + g.X8,
 			X9 = f.X9 + g.X9
 		};
-
+		
+		/// <summary>
+		/// h = f - g
+		/// Can overlap h with f or g.
+		/// 
+		/// Preconditions:
+		/// |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+		/// |g| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+		/// 
+		/// Postconditions:
+		/// |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+		/// </summary>
+		/// <param name="h"></param>
+		/// <param name="f"></param>
+		/// <param name="g"></param>
+		internal static FieldElement Sub(ref FieldElement f, ref FieldElement g) => new FieldElement
+		{
+			X0 = f.X0 - g.X0,
+			X1 = f.X1 - g.X1,
+			X2 = f.X2 - g.X2,
+			X3 = f.X3 - g.X3,
+			X4 = f.X4 - g.X4,
+			X5 = f.X5 - g.X5,
+			X6 = f.X6 - g.X6,
+			X7 = f.X7 - g.X7,
+			X8 = f.X8 - g.X8,
+			X9 = f.X9 - g.X9
+		};		
 		
 		/// <summary>
 		/// Replace (f,g) with (g,g) if b == 1;
-		/// replace (f,g) with (f,g) if b == 0.
+		/// Replace (f,g) with (f,g) if b == 0.
 		///
 		/// Preconditions: b in {0,1}.
 		/// </summary>
 		/// <param name="f"></param>
 		/// <param name="g"></param>
 		/// <param name="b"></param>
-		internal static void Cmov(ref FieldElement f, ref FieldElement g, int b)
+		internal static void Mov(ref FieldElement f, ref FieldElement g, int b)
 		{
 			b = -b;
 			f.X0 = f.X0 ^ ((f.X0 ^ g.X0) & b);
@@ -59,8 +83,7 @@
 			f.X8 = f.X8 ^ ((f.X8 ^ g.X8) & b);
 			f.X9 = f.X9 ^ ((f.X9 ^ g.X9) & b);			
 		}
-		
-		
+				
 		/// <summary>
 		/// Replace (f,g) with (g,f) if b == 1;
 		/// replace (f,g) with (f,g) if b == 0.
@@ -70,7 +93,7 @@
 		/// <param name="f"></param>
 		/// <param name="g"></param>
 		/// <param name="b"></param>
-		public static void Cswap(ref FieldElement f, ref FieldElement g, uint b)
+		internal static void Swap(ref FieldElement f, ref FieldElement g, uint b)
 		{			
 			var negb = unchecked((int)-b);					
 			var x0 = (f.X0 ^ g.X0) & negb;
@@ -105,15 +128,14 @@
 			g.X8 = g.X8 ^ x8;
 			g.X9 = g.X9 ^ x9;
 		}
-		
-		
+				
 		/// <summary>
 		/// Does NOT ignore top bit
 		/// </summary>
 		/// <param name="data"></param>
 		/// <param name="offset"></param>
 		/// <returns></returns>
-		internal static FieldElement FromBytes(byte[] data, int offset)
+		internal static FieldElement FromBytes(byte[] data, int offset = 0)
 		{
 			long Load3(byte[] data3, int offset3)
 			{
@@ -198,143 +220,97 @@
 				X9 = (int) h9
 			};
 		}
-		
-		
+				
 		internal static FieldElement Invert(ref FieldElement z)
 		{
 			int i;
 
-			/* z2 = z1^2^1 */
-			/* asm 1: fe_sq(>z2=fe#1,<z1=fe#11); for (i = 1;i < 1;++i) fe_sq(>z2=fe#1,>z2=fe#1); */
-			/* asm 2: fe_sq(>z2=t0,<z1=z); for (i = 1;i < 1;++i) fe_sq(>z2=t0,>z2=t0); */
-			var t0 = Squared(ref z); //for (i = 1; i < 1; ++i) fe_sq(out t0, ref t0);
+			/* z2 = z1^2^1 */			
+			var t0 = Squared(ref z);
 
-			/* z8 = z2^2^2 */
-			/* asm 1: fe_sq(>z8=fe#2,<z2=fe#1); for (i = 1;i < 2;++i) fe_sq(>z8=fe#2,>z8=fe#2); */
-			/* asm 2: fe_sq(>z8=t1,<z2=t0); for (i = 1;i < 2;++i) fe_sq(>z8=t1,>z8=t1); */
+			/* z8 = z2^2^2 */		
 			var t1 = Squared(ref t0); 
 			for (i = 1; i < 2; ++i) 
 				t1 = Squared(ref t1);
 
 			/* z9 = z1*z8 */
-			/* asm 1: fe_mul(>z9=fe#2,<z1=fe#11,<z8=fe#2); */
-			/* asm 2: fe_mul(>z9=t1,<z1=z,<z8=t1); */
-			t1 = Multiply(ref z, ref t1);
+			t1 = Multiplication(ref z, ref t1);
 
 			/* z11 = z2*z9 */
-			/* asm 1: fe_mul(>z11=fe#1,<z2=fe#1,<z9=fe#2); */
-			/* asm 2: fe_mul(>z11=t0,<z2=t0,<z9=t1); */
-			t0 = Multiply(ref t0, ref t1);
+			t0 = Multiplication(ref t0, ref t1);
 
 			/* z22 = z11^2^1 */
-			/* asm 1: fe_sq(>z22=fe#3,<z11=fe#1); for (i = 1;i < 1;++i) fe_sq(>z22=fe#3,>z22=fe#3); */
-			/* asm 2: fe_sq(>z22=t2,<z11=t0); for (i = 1;i < 1;++i) fe_sq(>z22=t2,>z22=t2); */
-			var t2 = Squared(ref t0); //for (i = 1; i < 1; ++i) fe_sq(out t2, ref t2);
+			var t2 = Squared(ref t0); 
 
 			/* z_5_0 = z9*z22 */
-			/* asm 1: fe_mul(>z_5_0=fe#2,<z9=fe#2,<z22=fe#3); */
-			/* asm 2: fe_mul(>z_5_0=t1,<z9=t1,<z22=t2); */
-			t1 = Multiply(ref t1, ref t2);
+			t1 = Multiplication(ref t1, ref t2);
 
 			/* z_10_5 = z_5_0^2^5 */
-			/* asm 1: fe_sq(>z_10_5=fe#3,<z_5_0=fe#2); for (i = 1;i < 5;++i) fe_sq(>z_10_5=fe#3,>z_10_5=fe#3); */
-			/* asm 2: fe_sq(>z_10_5=t2,<z_5_0=t1); for (i = 1;i < 5;++i) fe_sq(>z_10_5=t2,>z_10_5=t2); */
 			t2 = Squared(ref t1); 
 			for (i = 1; i < 5; ++i) 
 				t2 = Squared(ref t2);
 
 			/* z_10_0 = z_10_5*z_5_0 */
-			/* asm 1: fe_mul(>z_10_0=fe#2,<z_10_5=fe#3,<z_5_0=fe#2); */
-			/* asm 2: fe_mul(>z_10_0=t1,<z_10_5=t2,<z_5_0=t1); */
-			t1 = Multiply(ref t2, ref t1);
+			t1 = Multiplication(ref t2, ref t1);
 
 			/* z_20_10 = z_10_0^2^10 */
-			/* asm 1: fe_sq(>z_20_10=fe#3,<z_10_0=fe#2); for (i = 1;i < 10;++i) fe_sq(>z_20_10=fe#3,>z_20_10=fe#3); */
-			/* asm 2: fe_sq(>z_20_10=t2,<z_10_0=t1); for (i = 1;i < 10;++i) fe_sq(>z_20_10=t2,>z_20_10=t2); */
 			t2 = Squared(ref t1); 
 			for (i = 1; i < 10; ++i) 
 				t2 = Squared(ref t2);
 
 			/* z_20_0 = z_20_10*z_10_0 */
-			/* asm 1: fe_mul(>z_20_0=fe#3,<z_20_10=fe#3,<z_10_0=fe#2); */
-			/* asm 2: fe_mul(>z_20_0=t2,<z_20_10=t2,<z_10_0=t1); */
-			t2 = Multiply(ref t2, ref t1);
+			t2 = Multiplication(ref t2, ref t1);
 
 			/* z_40_20 = z_20_0^2^20 */
-			/* asm 1: fe_sq(>z_40_20=fe#4,<z_20_0=fe#3); for (i = 1;i < 20;++i) fe_sq(>z_40_20=fe#4,>z_40_20=fe#4); */
-			/* asm 2: fe_sq(>z_40_20=t3,<z_20_0=t2); for (i = 1;i < 20;++i) fe_sq(>z_40_20=t3,>z_40_20=t3); */
 			var t3 = Squared(ref t2); 
 			for (i = 1; i < 20; ++i) 
 				t3 = Squared(ref t3);
 
 			/* z_40_0 = z_40_20*z_20_0 */
-			/* asm 1: fe_mul(>z_40_0=fe#3,<z_40_20=fe#4,<z_20_0=fe#3); */
-			/* asm 2: fe_mul(>z_40_0=t2,<z_40_20=t3,<z_20_0=t2); */
-			t2 = Multiply(ref t3, ref t2);
+			t2 = Multiplication(ref t3, ref t2);
 
 			/* z_50_10 = z_40_0^2^10 */
-			/* asm 1: fe_sq(>z_50_10=fe#3,<z_40_0=fe#3); for (i = 1;i < 10;++i) fe_sq(>z_50_10=fe#3,>z_50_10=fe#3); */
-			/* asm 2: fe_sq(>z_50_10=t2,<z_40_0=t2); for (i = 1;i < 10;++i) fe_sq(>z_50_10=t2,>z_50_10=t2); */
 			t2 = Squared(ref t2); 
 			for (i = 1; i < 10; ++i) 
 				t2 = Squared(ref t2);
 
 			/* z_50_0 = z_50_10*z_10_0 */
-			/* asm 1: fe_mul(>z_50_0=fe#2,<z_50_10=fe#3,<z_10_0=fe#2); */
-			/* asm 2: fe_mul(>z_50_0=t1,<z_50_10=t2,<z_10_0=t1); */
-			t1 = Multiply(ref t2, ref t1);
+			t1 = Multiplication(ref t2, ref t1);
 
 			/* z_100_50 = z_50_0^2^50 */
-			/* asm 1: fe_sq(>z_100_50=fe#3,<z_50_0=fe#2); for (i = 1;i < 50;++i) fe_sq(>z_100_50=fe#3,>z_100_50=fe#3); */
-			/* asm 2: fe_sq(>z_100_50=t2,<z_50_0=t1); for (i = 1;i < 50;++i) fe_sq(>z_100_50=t2,>z_100_50=t2); */
 			t2 = Squared(ref t1); 
 			for (i = 1; i < 50; ++i) 
 				t2 = Squared(ref t2);
 
 			/* z_100_0 = z_100_50*z_50_0 */
-			/* asm 1: fe_mul(>z_100_0=fe#3,<z_100_50=fe#3,<z_50_0=fe#2); */
-			/* asm 2: fe_mul(>z_100_0=t2,<z_100_50=t2,<z_50_0=t1); */
-			t2 = Multiply(ref t2, ref t1);
+			t2 = Multiplication(ref t2, ref t1);
 
 			/* z_200_100 = z_100_0^2^100 */
-			/* asm 1: fe_sq(>z_200_100=fe#4,<z_100_0=fe#3); for (i = 1;i < 100;++i) fe_sq(>z_200_100=fe#4,>z_200_100=fe#4); */
-			/* asm 2: fe_sq(>z_200_100=t3,<z_100_0=t2); for (i = 1;i < 100;++i) fe_sq(>z_200_100=t3,>z_200_100=t3); */
 			t3 = Squared(ref t2); 
 			for (i = 1; i < 100; ++i) 
 				t3 = Squared(ref t3);
 
 			/* z_200_0 = z_200_100*z_100_0 */
-			/* asm 1: fe_mul(>z_200_0=fe#3,<z_200_100=fe#4,<z_100_0=fe#3); */
-			/* asm 2: fe_mul(>z_200_0=t2,<z_200_100=t3,<z_100_0=t2); */
-			t2 = Multiply(ref t3, ref t2);
+			t2 = Multiplication(ref t3, ref t2);
 
 			/* z_250_50 = z_200_0^2^50 */
-			/* asm 1: fe_sq(>z_250_50=fe#3,<z_200_0=fe#3); for (i = 1;i < 50;++i) fe_sq(>z_250_50=fe#3,>z_250_50=fe#3); */
-			/* asm 2: fe_sq(>z_250_50=t2,<z_200_0=t2); for (i = 1;i < 50;++i) fe_sq(>z_250_50=t2,>z_250_50=t2); */
 			t2 = Squared(ref t2); 
 			for (i = 1; i < 50; ++i) 
 				t2 = Squared(ref t2);
 
 			/* z_250_0 = z_250_50*z_50_0 */
-			/* asm 1: fe_mul(>z_250_0=fe#2,<z_250_50=fe#3,<z_50_0=fe#2); */
-			/* asm 2: fe_mul(>z_250_0=t1,<z_250_50=t2,<z_50_0=t1); */
-			t1 = Multiply(ref t2, ref t1);
+			t1 = Multiplication(ref t2, ref t1);
 
 			/* z_255_5 = z_250_0^2^5 */
-			/* asm 1: fe_sq(>z_255_5=fe#2,<z_250_0=fe#2); for (i = 1;i < 5;++i) fe_sq(>z_255_5=fe#2,>z_255_5=fe#2); */
-			/* asm 2: fe_sq(>z_255_5=t1,<z_250_0=t1); for (i = 1;i < 5;++i) fe_sq(>z_255_5=t1,>z_255_5=t1); */
 			t1 = Squared(ref t1); 
 			for (i = 1; i < 5; ++i) 
 				t1 = Squared(ref t1);
 
 			/* z_255_21 = z_255_5*z11 */
-			/* asm 1: fe_mul(>z_255_21=fe#12,<z_255_5=fe#2,<z11=fe#1); */
-			/* asm 2: fe_mul(>z_255_21=out,<z_255_5=t1,<z11=t0); */
-			var result = Multiply(ref t1, ref t0);
+			var result = Multiplication(ref t1, ref t0);
 
 			return result;
-		}
-		
+		}		
 				
 		/// <summary>
 		/// h = f * g
@@ -349,7 +325,7 @@
 		/// </summary>		
 		/// <param name="f"></param>
 		/// <param name="g"></param>
-		internal static FieldElement Multiply(ref FieldElement f, ref FieldElement g)
+		internal static FieldElement Multiplication(ref FieldElement f, ref FieldElement g)
 		{					
 			/*
 			Notes on implementation strategy:
@@ -371,15 +347,15 @@
 			With tighter constraints on inputs can squeeze carries into int32.
 			*/
 			
-			var h0 = f.X0 * (long)g.X0 + (2 * f.X1) * (long)(19 * g.X9) + f.X2 * (long)(19 * g.X8) + (2 * f.X3) * (long)(19 * g.X7) + f.X4 * (long)(19 * g.X6) + (2 * f.X5) * (long)(19 * g.X5) + f.X6 * (long)(19 * g.X4) + (2 * f.X7) * (long)(19 * g.X3) + f.X8 * (long)(19 * g.X2) + (2 * f.X9) * (long)(19 * g.X1);
+			var h0 = f.X0 * (long)g.X0 + 2 * f.X1 * (long)(19 * g.X9) + f.X2 * (long)(19 * g.X8) + 2 * f.X3 * (long)(19 * g.X7) + f.X4 * (long)(19 * g.X6) + 2 * f.X5 * (long)(19 * g.X5) + f.X6 * (long)(19 * g.X4) + 2 * f.X7 * (long)(19 * g.X3) + f.X8 * (long)(19 * g.X2) + 2 * f.X9 * (long)(19 * g.X1);
 			var h1 = f.X0 * (long)g.X1 + f.X1 * (long)g.X0 + f.X2 * (long)(19 * g.X9) + f.X3 * (long)(19 * g.X8) + f.X4 * (long)(19 * g.X7) + f.X5 * (long)(19 * g.X6) + f.X6 * (long)(19 * g.X5) + f.X7 * (long)(19 * g.X4) + f.X8 * (long)(19 * g.X3) + f.X9 * (long)(19 * g.X2);
-			var h2 = f.X0 * (long)g.X2 + (2 * f.X1) * (long)g.X1 + f.X2 * (long)g.X0 + (2 * f.X3) * (long)(19 * g.X9) + f.X4 * (long)(19 * g.X8) + (2 * f.X5) * (long)(19 * g.X7) + f.X6 * (long)(19 * g.X6) + (2 * f.X7) * (long)(19 * g.X5) + f.X8 * (long)(19 * g.X4) + (2 * f.X9) * (long)(19 * g.X3);
+			var h2 = f.X0 * (long)g.X2 + 2 * f.X1 * (long)g.X1 + f.X2 * (long)g.X0 + 2 * f.X3 * (long)(19 * g.X9) + f.X4 * (long)(19 * g.X8) + 2 * f.X5 * (long)(19 * g.X7) + f.X6 * (long)(19 * g.X6) + 2 * f.X7 * (long)(19 * g.X5) + f.X8 * (long)(19 * g.X4) + 2 * f.X9 * (long)(19 * g.X3);
 			var h3 = f.X0 * (long)g.X3 + f.X1 * (long)g.X2 + f.X2 * (long)g.X1 + f.X3 * (long)g.X0 + f.X4 * (long)(19 * g.X9) + f.X5 * (long)(19 * g.X8) + f.X6 * (long)(19 * g.X7) + f.X7 * (long)(19 * g.X6) + f.X8 * (long)(19 * g.X5) + f.X9 * (long)(19 * g.X4);
-			var h4 = f.X0 * (long)g.X4 + (2 * f.X1) * (long)g.X3 + f.X2 * (long)g.X2 + (2 * f.X3) * (long)g.X1 + f.X4 * (long)g.X0 + (2 * f.X5) * (long)(19 * g.X9) + f.X6 * (long)(19 * g.X8) + (2 * f.X7) * (long)(19 * g.X7) + f.X8 * (long)(19 * g.X6) + (2 * f.X9) * (long)(19 * g.X5);
+			var h4 = f.X0 * (long)g.X4 + 2 * f.X1 * (long)g.X3 + f.X2 * (long)g.X2 + 2 * f.X3 * (long)g.X1 + f.X4 * (long)g.X0 + 2 * f.X5 * (long)(19 * g.X9) + f.X6 * (long)(19 * g.X8) + 2 * f.X7 * (long)(19 * g.X7) + f.X8 * (long)(19 * g.X6) + 2 * f.X9 * (long)(19 * g.X5);
 			var h5 = f.X0 * (long)g.X5 + f.X1 * (long)g.X4 + f.X2 * (long)g.X3 + f.X3 * (long)g.X2 + f.X4 * (long)g.X1 + f.X5 * (long)g.X0 + f.X6 * (long)(19 * g.X9) + f.X7 * (long)(19 * g.X8) + f.X8 * (long)(19 * g.X7) + f.X9 * (long)(19 * g.X6);
-			var h6 = f.X0 * (long)g.X6 + (2 * f.X1) * (long)g.X5 + f.X2 * (long)g.X4 + (2 * f.X3) * (long)g.X3 + f.X4 * (long)g.X2 + (2 * f.X5) * (long)g.X1 + f.X6 * (long)g.X0 + (2 * f.X7) * (long)(19 * g.X9) + f.X8 * (long)(19 * g.X8) + (2 * f.X9) * (long)(19 * g.X7);
+			var h6 = f.X0 * (long)g.X6 + 2 * f.X1 * (long)g.X5 + f.X2 * (long)g.X4 + 2 * f.X3 * (long)g.X3 + f.X4 * (long)g.X2 + 2 * f.X5 * (long)g.X1 + f.X6 * (long)g.X0 + 2 * f.X7 * (long)(19 * g.X9) + f.X8 * (long)(19 * g.X8) + 2 * f.X9 * (long)(19 * g.X7);
 			var h7 = f.X0 * (long)g.X7 + f.X1 * (long)g.X6 + f.X2 * (long)g.X5 + f.X3 * (long)g.X4 + f.X4 * (long)g.X3  + f.X5 * (long)g.X2 + f.X6 * (long)g.X1 + f.X7 * (long)g.X0 + f.X8 * (long)(19 * g.X9) + f.X9 * (long)(19 * g.X8);
-			var h8 = f.X0 * (long)g.X8 + (2 * f.X1) * (long)g.X7 + f.X2 * (long)g.X6 + (2 * f.X3) * (long)g.X5 + f.X4 * (long)g.X4 + (2 * f.X5) * (long)g.X3 + f.X6 * (long)g.X2 + (2 * f.X7) * (long)g.X1 + f.X8 * (long)g.X0 + (2 * f.X9) * (long)(19 * g.X9);
+			var h8 = f.X0 * (long)g.X8 + 2 * f.X1 * (long)g.X7 + f.X2 * (long)g.X6 + 2 * f.X3 * (long)g.X5 + f.X4 * (long)g.X4 + 2 * f.X5 * (long)g.X3 + f.X6 * (long)g.X2 + 2 * f.X7 * (long)g.X1 + f.X8 * (long)g.X0 + 2 * f.X9 * (long)(19 * g.X9);
 			var h9 = f.X0 * (long)g.X9 + f.X1 * (long)g.X8 + f.X2 * (long)g.X7 + f.X3 * (long)g.X6 + f.X4 * (long)g.X5 + f.X5 * (long)g.X4 + f.X6 * (long)g.X3 + f.X7 * (long)g.X2 + f.X8 * (long)g.X1 + f.X9 * (long)g.X0;
 
 			/*
@@ -451,8 +427,7 @@
 			};
 			return h;
 		}
-		
-		
+				
 		/// <summary>
 		/// h = -f
 		/// 
@@ -477,37 +452,7 @@
 			X8 = -f.X8,
 			X9 = -f.X9
 		};
-		
-		
-		/// <summary>
-		/// h = f - g
-		/// Can overlap h with f or g.
-		/// 
-		/// Preconditions:
-		/// |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
-		/// |g| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
-		/// 
-		/// Postconditions:
-		/// |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
-		/// </summary>
-		/// <param name="h"></param>
-		/// <param name="f"></param>
-		/// <param name="g"></param>
-		internal static FieldElement Sub(ref FieldElement f, ref FieldElement g) => new FieldElement
-		{
-			X0 = f.X0 - g.X0,
-			X1 = f.X1 - g.X1,
-			X2 = f.X2 - g.X2,
-			X3 = f.X3 - g.X3,
-			X4 = f.X4 - g.X4,
-			X5 = f.X5 - g.X5,
-			X6 = f.X6 - g.X6,
-			X7 = f.X7 - g.X7,
-			X8 = f.X8 - g.X8,
-			X9 = f.X9 - g.X9
-		};
-		
-		
+								
 		/// <summary>
 		/// h = f * 121666
 		/// Can overlap h with f.
@@ -520,7 +465,7 @@
 		/// </summary>
 		/// <param name="f"></param>
 		/// <returns></returns>
-		public static FieldElement Multiply121666(ref FieldElement f)
+		internal static FieldElement Multiply121666(ref FieldElement f)
 		{			
 			var h0 = f.X0 * (long)121666;
 			var h1 = f.X1 * (long)121666;
@@ -587,8 +532,7 @@
 				X9 = (int)h9
 			};
 		}
-		
-		
+				
 		/// <summary>
 		/// h = f * f
 		/// Can overlap h with f.
@@ -603,16 +547,16 @@
 		/// <returns></returns>
 		internal static FieldElement Squared(ref FieldElement f)
 		{		
-			var h0 = f.X0 * (long)f.X0 + (2 * f.X1) * (long)(38 * f.X9) + (2 * f.X2) * (long)(19 * f.X8) + (2 * f.X3) * (long)(38 * f.X7) + (2 * f.X4) * (long)(19 * f.X6) + f.X5 * (long)(38 * f.X5);
-			var h1 = (2 * f.X0) * (long)f.X1 + f.X2 * (long)(38 * f.X9) + (2 * f.X3) * (long)(19 * f.X8) + f.X4 * (long)(38 * f.X7) + (2 * f.X5) * (long)(19 * f.X6);
-			var h2 = (2 * f.X0) * (long)f.X2 + (2 * f.X1) * (long)f.X1 + (2 * f.X3) * (long)(38 * f.X9) + (2 * f.X4) * (long)(19 * f.X8) + (2 * f.X5) * (long)(38 * f.X7) + f.X6 * (long)(19 * f.X6);
-			var h3 = (2 * f.X0) * (long)f.X3 + (2 * f.X1) * (long)f.X2 + f.X4 * (long)(38 * f.X9) + (2 * f.X5) * (long)(19 * f.X8) + f.X6 * (long)(38 * f.X7);
-			var h4 = (2 * f.X0) * (long)f.X4 + (2 * f.X1) * (long)(2 * f.X3) + f.X2 * (long)f.X2 + (2 * f.X5) * (long)(38 * f.X9) + (2 * f.X6) * (long)(19 * f.X8) + f.X7 * (long)(38 * f.X7);
-			var h5 = (2 * f.X0) * (long)f.X5 + (2 * f.X1) * (long)f.X4 + (2 * f.X2) * (long)f.X3 + f.X6 * (long)(38 * f.X9) + (2 * f.X7) * (long)(19 * f.X8);
-			var h6 = (2 * f.X0) * (long)f.X6 + (2 * f.X1) * (long)(2 * f.X5) + (2 * f.X2) * (long)f.X4 + (2 * f.X3) * (long)f.X3 + (2 * f.X7) * (long)(38 * f.X9) + f.X8 * (long)(19 * f.X8);
-			var h7 = (2 * f.X0) * (long)f.X7 + (2 * f.X1) * (long)f.X6 + (2 * f.X2) * (long)f.X5 + (2 * f.X3) * (long)f.X4 + f.X8 * (long)(38 * f.X9);
-			var h8 = (2 * f.X0) * (long)f.X8 + (2 * f.X1) * (long)(2 * f.X7) + (2 * f.X2) * (long)f.X6 + (2 * f.X3) * (long)(2 * f.X5) + f.X4 * (long)f.X4 + f.X9 * (long)(38 * f.X9);
-			var h9 = (2 * f.X0) * (long)f.X9 + (2 * f.X1) * (long)f.X8 + (2 * f.X2) * (long)f.X7 + (2 * f.X3) * (long)f.X6 + (2 * f.X4) * (long)f.X5;	
+			var h0 = f.X0 * (long)f.X0 + 2 * f.X1 * (long)(38 * f.X9) + 2 * f.X2 * (long)(19 * f.X8) + 2 * f.X3 * (long)(38 * f.X7) + 2 * f.X4 * (long)(19 * f.X6) + f.X5 * (long)(38 * f.X5);
+			var h1 = 2 * f.X0 * (long)f.X1 + f.X2 * (long)(38 * f.X9) + 2 * f.X3 * (long)(19 * f.X8) + f.X4 * (long)(38 * f.X7) + 2 * f.X5 * (long)(19 * f.X6);
+			var h2 = 2 * f.X0 * (long)f.X2 + 2 * f.X1 * (long)f.X1 + 2 * f.X3 * (long)(38 * f.X9) + 2 * f.X4 * (long)(19 * f.X8) + 2 * f.X5 * (long)(38 * f.X7) + f.X6 * (long)(19 * f.X6);
+			var h3 = 2 * f.X0 * (long)f.X3 + 2 * f.X1 * (long)f.X2 + f.X4 * (long)(38 * f.X9) + 2 * f.X5 * (long)(19 * f.X8) + f.X6 * (long)(38 * f.X7);
+			var h4 = 2 * f.X0 * (long)f.X4 + 2 * f.X1 * (long)(2 * f.X3) + f.X2 * (long)f.X2 + 2 * f.X5 * (long)(38 * f.X9) + 2 * f.X6 * (long)(19 * f.X8) + f.X7 * (long)(38 * f.X7);
+			var h5 = 2 * f.X0 * (long)f.X5 + 2 * f.X1 * (long)f.X4 + 2 * f.X2 * (long)f.X3 + f.X6 * (long)(38 * f.X9) + 2 * f.X7 * (long)(19 * f.X8);
+			var h6 = 2 * f.X0 * (long)f.X6 + 2 * f.X1 * (long)(2 * f.X5) + 2 * f.X2 * (long)f.X4 + 2 * f.X3 * (long)f.X3 + 2 * f.X7 * (long)(38 * f.X9) + f.X8 * (long)(19 * f.X8);
+			var h7 = 2 * f.X0 * (long)f.X7 + 2 * f.X1 * (long)f.X6 + 2 * f.X2 * (long)f.X5 + 2 * f.X3 * (long)f.X4 + f.X8 * (long)(38 * f.X9);
+			var h8 = 2 * f.X0 * (long)f.X8 + 2 * f.X1 * (long)(2 * f.X7) + 2 * f.X2 * (long)f.X6 + 2 * f.X3 * (long)(2 * f.X5) + f.X4 * (long)f.X4 + f.X9 * (long)(38 * f.X9);
+			var h9 = 2 * f.X0 * (long)f.X9 + 2 * f.X1 * (long)f.X8 + 2 * f.X2 * (long)f.X7 + 2 * f.X3 * (long)f.X6 + 2 * f.X4 * (long)f.X5;	
 
 			var carry0 = (h0 + (1 << 25)) >> 26; 
 			h1 += carry0; 
@@ -675,8 +619,7 @@
 				X8 = (int) h8,
 				X9 = (int) h9
 			};
-		}
-		
+		}		
 		
 		/// <summary>
         /// Preconditions:
@@ -705,7 +648,7 @@
         /// <param name="s"></param>
         /// <param name="offset"></param>
         /// <param name="h"></param>
-        internal static void ToBytes(byte[] s, int offset, ref FieldElement h)
+        internal static void ToBytes(byte[] s, ref FieldElement h, int offset = 0)
         {            
             var hr = Reduce(ref h);
             /*
@@ -750,81 +693,7 @@
                 s[offset + 31] = (byte) (hr.X9 >> 18);
             }
         }
-
-		
-        private static FieldElement Reduce( ref FieldElement h)
-        {
-            var q = (19 * h.X9 + (1 << 24)) >> 25;
-            q = (h.X0 + q) >> 26;
-            q = (h.X1 + q) >> 25;
-            q = (h.X2 + q) >> 26;
-            q = (h.X3 + q) >> 25;
-            q = (h.X4 + q) >> 26;
-            q = (h.X5 + q) >> 25;
-            q = (h.X6 + q) >> 26;
-            q = (h.X7 + q) >> 25;
-            q = (h.X8 + q) >> 26;
-            q = (h.X9 + q) >> 25;
-
-            /* Goal: Output h-(2^255-19)q, which is between 0 and 2^255-20. */
-            h.X0 += 19 * q;
-            /* Goal: Output h-2^255 q, which is between 0 and 2^255-20. */
-            var carry0 = h.X0 >> 26; 
-            h.X1 += carry0; 
-            h.X0 -= carry0 << 26;
-            
-            var carry1 = h.X1 >> 25; 
-            h.X2 += carry1; 
-            h.X1 -= carry1 << 25;
-            
-            var carry2 = h.X2 >> 26; 
-            h.X3 += carry2; 
-            h.X2 -= carry2 << 26;
-            
-            var carry3 = h.X3 >> 25; 
-            h.X4 += carry3; 
-            h.X3 -= carry3 << 25;
-            
-            var carry4 = h.X4 >> 26; 
-            h.X5 += carry4; 
-            h.X4 -= carry4 << 26;
-            
-            var carry5 = h.X5 >> 25; 
-            h.X6 += carry5; 
-            h.X5 -= carry5 << 25;
-            
-            var carry6 = h.X6 >> 26; 
-            h.X7 += carry6; 
-            h.X6 -= carry6 << 26;
-            
-            var carry7 = h.X7 >> 25; 
-            h.X8 += carry7; 
-            h.X7 -= carry7 << 25;
-            
-            var carry8 = h.X8 >> 26; 
-            h.X9 += carry8; 
-            h.X8 -= carry8 << 26;
-            
-            var carry9 = h.X9 >> 25; 
-            h.X9 -= carry9 << 25;
-            /* h10 = carry9 */
-
-            return new FieldElement
-            {
-                X0 = h.X0,
-                X1 = h.X1,
-                X2 = h.X2,
-                X3 = h.X3,
-                X4 = h.X4,
-                X5 = h.X5,
-                X6 = h.X6,
-                X7 = h.X7,
-                X8 = h.X8,
-                X9 = h.X9
-            };
-        }
-		
-		
+		       		
 		/// <summary>
 		/// h = 2 * f * f
 		/// Can overlap h with f.
@@ -838,16 +707,16 @@
 		/// <param name="f"></param>
 		internal static FieldElement DoubleSquare(ref FieldElement f)
 		{
-			var h0 = f.X0 * (long)f.X0 + (2 * f.X1) * (long)(38 * f.X9) + (2 * f.X2) * (long)(19 * f.X8) + (2 * f.X3) * (long)(38 * f.X7) + (2 * f.X4) * (long)(19 * f.X6) + f.X5 * (long)(38 * f.X5);
-			var h1 = (2 * f.X0) * (long)f.X1 + f.X2 * (long)(38 * f.X9) + (2 * f.X3) * (long)(19 * f.X8) + f.X4 * (long)(38 * f.X7) + (2 * f.X5) * (long)(19 * f.X6);
-			var h2 = (2 * f.X0) * (long)f.X2 + (2 * f.X1) * (long)f.X1 + (2 * f.X3) * (long)(38 * f.X9) + (2 * f.X4) * (long)(19 * f.X8) + (2 * f.X5) * (long)(38 * f.X7) + f.X6 * (long)(19 * f.X6);
-			var h3 = (2 * f.X0) * (long)f.X3 + (2 * f.X1) * (long)f.X2 + f.X4 * (long)(38 * f.X9) + (2 * f.X5) * (long)(19 * f.X8) + f.X6 * (long)(38 * f.X7);
-			var h4 = (2 * f.X0) * (long)f.X4 + (2 * f.X1) * (long)(2 * f.X3) + f.X2 * (long)f.X2 + (2 * f.X5) * (long)(38 * f.X9) + (2 * f.X6) * (long)(19 * f.X8) + f.X7 * (long)(38 * f.X7);
-			var h5 = (2 * f.X0) * (long)f.X5 + (2 * f.X1) * (long)f.X4 + (2 * f.X2) * (long)f.X3 + f.X6 * (long)(38 * f.X9) + (2 * f.X7) * (long)(19 * f.X8);
-			var h6 = (2 * f.X0) * (long)f.X6 + (2 * f.X1) * (long)(2 * f.X5) + (2 * f.X2) * (long)f.X4 + (2 * f.X3) * (long)f.X3 + (2 * f.X7) * (long)(38 * f.X9) + f.X8 * (long)(19 * f.X8);
-			var h7 = (2 * f.X0) * (long)f.X7 + (2 * f.X1) * (long)f.X6 + (2 * f.X2) * (long)f.X5 + (2 * f.X3) * (long)f.X4 + f.X8 * (long)(38 * f.X9);
-			var h8 = (2 * f.X0) * (long)f.X8 + (2 * f.X1) * (long)(2 * f.X7) + (2 * f.X2) * (long)f.X6 + (2 * f.X3) * (long)(2 * f.X5) + f.X4 * (long)f.X4 + f.X9 * (long)(38 * f.X9);
-			var h9 = (2 * f.X0) * (long)f.X9 + (2 * f.X1) * (long)f.X8 + (2 * f.X2) * (long)f.X7 + (2 * f.X3) * (long)f.X6 + (2 * f.X4) * (long)f.X5;			
+			var h0 = f.X0 * (long)f.X0 + 2 * f.X1 * (long)(38 * f.X9) + 2 * f.X2 * (long)(19 * f.X8) + 2 * f.X3 * (long)(38 * f.X7) + 2 * f.X4 * (long)(19 * f.X6) + f.X5 * (long)(38 * f.X5);
+			var h1 = 2 * f.X0 * (long)f.X1 + f.X2 * (long)(38 * f.X9) + 2 * f.X3 * (long)(19 * f.X8) + f.X4 * (long)(38 * f.X7) + 2 * f.X5 * (long)(19 * f.X6);
+			var h2 = 2 * f.X0 * (long)f.X2 + 2 * f.X1 * (long)f.X1 + 2 * f.X3 * (long)(38 * f.X9) + 2 * f.X4 * (long)(19 * f.X8) + 2 * f.X5 * (long)(38 * f.X7) + f.X6 * (long)(19 * f.X6);
+			var h3 = 2 * f.X0 * (long)f.X3 + 2 * f.X1 * (long)f.X2 + f.X4 * (long)(38 * f.X9) + 2 * f.X5 * (long)(19 * f.X8) + f.X6 * (long)(38 * f.X7);
+			var h4 = 2 * f.X0 * (long)f.X4 + 2 * f.X1 * (long)(2 * f.X3) + f.X2 * (long)f.X2 + 2 * f.X5 * (long)(38 * f.X9) + 2 * f.X6 * (long)(19 * f.X8) + f.X7 * (long)(38 * f.X7);
+			var h5 = 2 * f.X0 * (long)f.X5 + 2 * f.X1 * (long)f.X4 + 2 * f.X2 * (long)f.X3 + f.X6 * (long)(38 * f.X9) + 2 * f.X7 * (long)(19 * f.X8);
+			var h6 = 2 * f.X0 * (long)f.X6 + 2 * f.X1 * (long)(2 * f.X5) + 2 * f.X2 * (long)f.X4 + 2 * f.X3 * (long)f.X3 + 2 * f.X7 * (long)(38 * f.X9) + f.X8 * (long)(19 * f.X8);
+			var h7 = 2 * f.X0 * (long)f.X7 + 2 * f.X1 * (long)f.X6 + 2 * f.X2 * (long)f.X5 + 2 * f.X3 * (long)f.X4 + f.X8 * (long)(38 * f.X9);
+			var h8 = 2 * f.X0 * (long)f.X8 + 2 * f.X1 * (long)(2 * f.X7) + 2 * f.X2 * (long)f.X6 + 2 * f.X3 * (long)(2 * f.X5) + f.X4 * (long)f.X4 + f.X9 * (long)(38 * f.X9);
+			var h9 = 2 * f.X0 * (long)f.X9 + 2 * f.X1 * (long)f.X8 + 2 * f.X2 * (long)f.X7 + 2 * f.X3 * (long)f.X6 + 2 * f.X4 * (long)f.X5;			
 
 			h0 += h0;
 			h1 += h1;
@@ -922,5 +791,77 @@
 				X9 = (int)h9
 			};
 		}
+				
+		private static FieldElement Reduce( ref FieldElement h)
+        {
+            var q = (19 * h.X9 + (1 << 24)) >> 25;
+            q = (h.X0 + q) >> 26;
+            q = (h.X1 + q) >> 25;
+            q = (h.X2 + q) >> 26;
+            q = (h.X3 + q) >> 25;
+            q = (h.X4 + q) >> 26;
+            q = (h.X5 + q) >> 25;
+            q = (h.X6 + q) >> 26;
+            q = (h.X7 + q) >> 25;
+            q = (h.X8 + q) >> 26;
+            q = (h.X9 + q) >> 25;
+
+            /* Goal: Output h-(2^255-19)q, which is between 0 and 2^255-20. */
+            h.X0 += 19 * q;
+            /* Goal: Output h-2^255 q, which is between 0 and 2^255-20. */
+            var carry0 = h.X0 >> 26; 
+            h.X1 += carry0; 
+            h.X0 -= carry0 << 26;
+            
+            var carry1 = h.X1 >> 25; 
+            h.X2 += carry1; 
+            h.X1 -= carry1 << 25;
+            
+            var carry2 = h.X2 >> 26; 
+            h.X3 += carry2; 
+            h.X2 -= carry2 << 26;
+            
+            var carry3 = h.X3 >> 25; 
+            h.X4 += carry3; 
+            h.X3 -= carry3 << 25;
+            
+            var carry4 = h.X4 >> 26; 
+            h.X5 += carry4; 
+            h.X4 -= carry4 << 26;
+            
+            var carry5 = h.X5 >> 25; 
+            h.X6 += carry5; 
+            h.X5 -= carry5 << 25;
+            
+            var carry6 = h.X6 >> 26; 
+            h.X7 += carry6; 
+            h.X6 -= carry6 << 26;
+            
+            var carry7 = h.X7 >> 25; 
+            h.X8 += carry7; 
+            h.X7 -= carry7 << 25;
+            
+            var carry8 = h.X8 >> 26; 
+            h.X9 += carry8; 
+            h.X8 -= carry8 << 26;
+            
+            var carry9 = h.X9 >> 25; 
+            h.X9 -= carry9 << 25;
+            /* h10 = carry9 */
+
+            return new FieldElement
+            {
+                X0 = h.X0,
+                X1 = h.X1,
+                X2 = h.X2,
+                X3 = h.X3,
+                X4 = h.X4,
+                X5 = h.X5,
+                X6 = h.X6,
+                X7 = h.X7,
+                X8 = h.X8,
+                X9 = h.X9
+            };
+        }		
 	}
 }
